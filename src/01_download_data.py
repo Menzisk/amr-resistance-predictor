@@ -1,16 +1,30 @@
+#!/usr/bin/env python3
 """
 01_download_data.py
 
 Downloads Acinetobacter baumannii AMR phenotype data from BV-BRC public API.
-Saves raw data to data/raw/ as a clean TSV.
 
-Data source: BV-BRC (https://www.bv-brc.org)
-Organism:    Acinetobacter baumannii (NCBI Taxon ID: 470)
+This script queries the BV-BRC genome_amr endpoint for A. baumannii (taxon_id=470)
+records with laboratory-confirmed resistance phenotypes. It downloads Resistant and
+Susceptible records separately to ensure both classes are captured, filters to
+laboratory-confirmed evidence only, and saves the raw data as a TSV file.
 
-Strategy: Download Resistant and Susceptible records separately to ensure
-both classes are captured regardless of API result ordering.
+Inputs:
+    None (all parameters are configured in config.yaml)
 
-Field names verified by direct schema inspection on 2026-06-16.
+Outputs:
+    data/raw/acinetobacter_baumannii_amr_raw.tsv
+        - Tab-separated file with raw AMR phenotype records
+        - Columns: antibiotic, measurement_value, resistant_phenotype, evidence,
+                   genome_id, genome_name, laboratory_typing_method, taxon_id,
+                   measurement_sign, measurement_unit
+
+Usage:
+    python src/01_download_data.py
+
+Author: Menzi Sikakane (menzisk)
+Date:   2026-06-17
+License: MIT
 """
 
 import requests
@@ -18,11 +32,24 @@ import pandas as pd
 import os
 import json
 import time
+import yaml
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# ── Load Configuration ─────────────────────────────────────────────────────
+# Read config.yaml and store it in a variable called CONFIG
+with open("config.yaml", "r") as f:
+    CONFIG = yaml.safe_load(f)
+
+# Extract settings we need
+TAXON_ID = CONFIG['data']['taxon_id']
+PHENOTYPE_CLASSES = CONFIG['data']['phenotype_classes']
+LIMIT_PER_CLASS = CONFIG['data']['limit_per_class']
+RAW_DIR = CONFIG['data']['raw_dir']
+
+# ── Constants ──────────────────────────────────────────────────────────────
 
 BASE_URL = "https://www.bv-brc.org/api/genome_amr/"
 
+# Fields we want from the API
 FIELDS = [
     "genome_id",
     "genome_name",
@@ -36,21 +63,9 @@ FIELDS = [
     "taxon_id",
 ]
 
-# NCBI Taxonomy ID for Acinetobacter baumannii
-TAXON_ID = 470
+OUTPUT_FILE = os.path.join(RAW_DIR, "acinetobacter_baumannii_amr_raw.tsv")
 
-# We download each phenotype class separately to guarantee both are captured
-PHENOTYPE_CLASSES = ["Resistant", "Susceptible"]
-
-# How many records to request per class
-# BV-BRC allows up to 25000 per request
-LIMIT_PER_CLASS = 25000
-
-OUTPUT_DIR  = "data/raw"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "acinetobacter_baumannii_amr_raw.tsv")
-
-
-# ── Functions ────────────────────────────────────────────────────────────────
+# ── Functions ──────────────────────────────────────────────────────────────
 
 def build_query_url(phenotype: str) -> str:
     """
@@ -134,13 +149,10 @@ def download_amr_data() -> pd.DataFrame:
     for phenotype in PHENOTYPE_CLASSES:
         df_class = download_one_class(phenotype)
         frames.append(df_class)
-        # Wait 1 second between requests
-        # This is called rate limiting and is good API etiquette
+        # Be polite to the server — wait 1 second between requests
         time.sleep(1)
 
     # pd.concat() stacks DataFrames vertically (row-wise)
-    # ignore_index=True resets the row numbers so they run 0,1,2,...
-    # without it you would have duplicate index numbers from each chunk
     df_combined = pd.concat(frames, ignore_index=True)
 
     print(f"\nTotal records combined: {len(df_combined):,}")
@@ -155,9 +167,6 @@ def filter_laboratory_only(df: pd.DataFrame) -> pd.DataFrame:
     Training our model on another model's predictions would be
     circular — we would be learning from model noise, not biology.
 
-    This is a fundamental principle in machine learning:
-    your labels must come from ground truth, not other models.
-
     Args:
         df: raw combined DataFrame
 
@@ -166,7 +175,7 @@ def filter_laboratory_only(df: pd.DataFrame) -> pd.DataFrame:
     """
     before = len(df)
     df_lab = df[df["evidence"] == "Laboratory Method"].copy()
-    after  = len(df_lab)
+    after = len(df_lab)
 
     print(f"\nFiltering to Laboratory Method only:")
     print(f"  Before : {before:,} records")
@@ -177,26 +186,14 @@ def filter_laboratory_only(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_raw_data(df: pd.DataFrame) -> None:
-    """
-    Save raw DataFrame to TSV without modification.
-    Raw data is never modified after saving — only read.
-
-    Args:
-        df: DataFrame to save
-    """
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    """Save raw DataFrame to TSV without modification."""
+    os.makedirs(RAW_DIR, exist_ok=True)
     df.to_csv(OUTPUT_FILE, sep="\t", index=False)
     print(f"\nRaw data saved → {OUTPUT_FILE}")
 
 
 def print_data_summary(df: pd.DataFrame) -> None:
-    """
-    Print a plain-language summary of the downloaded dataset.
-    First sanity check before any cleaning or analysis.
-
-    Args:
-        df: raw DataFrame
-    """
+    """Print a plain-language summary of the downloaded dataset."""
     print("\n" + "=" * 60)
     print("DATA SUMMARY")
     print("=" * 60)
@@ -221,9 +218,18 @@ def print_data_summary(df: pd.DataFrame) -> None:
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
+    # Step 1: Download both phenotype classes
     df_raw = download_amr_data()
+
+    # Step 2: Filter to laboratory-confirmed only
     df_lab = filter_laboratory_only(df_raw)
+
+    # Step 3: Save
     save_raw_data(df_lab)
+
+    # Step 4: Summarise what we have
     print_data_summary(df_lab)
-    print("\n✓ Download complete.")
+
+    print("\n Download complete.")

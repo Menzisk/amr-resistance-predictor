@@ -1,24 +1,36 @@
+#!/usr/bin/env python3
 """
 04_shap_analysis.py
 
-SHAP (SHapley Additive exPlanations) interpretability analysis
-for the XGBoost AMR resistance classifier.
+SHAP interpretability analysis for the XGBoost AMR classifier.
 
-Produces:
-    - SHAP summary plot (beeswarm)
-    - SHAP bar plot (mean absolute importance)
-    - SHAP waterfall plot (single prediction)
+This script computes SHAP (SHapley Additive exPlanations) values to explain
+individual predictions. It produces:
+    1. Beeswarm summary plot - global feature importance
+    2. Bar plot - ranked mean absolute SHAP values
+    3. Waterfall plots - single prediction explanations
+
+Inputs:
+    data/processed/amr_features.tsv
+        - Engineered features from 02_clean_and_engineer.py
+    outputs/models/xgboost_model.pkl (optional)
+        - Trained model from 03_train_model.py (retrains if not found)
+
+Outputs:
+    outputs/figures/06_shap_summary_beeswarm.png
+    outputs/figures/07_shap_bar_importance.png
+    outputs/figures/08_shap_waterfall_*.png
+
+Usage:
+    python src/04_shap_analysis.py
 
 References:
-    Lundberg & Lee (2017). A unified approach to interpreting model
-    predictions. NeurIPS 2017. https://arxiv.org/abs/1705.07874
+    Lundberg & Lee (2017). A unified approach to interpreting model predictions.
+    NeurIPS 2017. https://arxiv.org/abs/1705.07874
 
-    Lundberg et al. (2020). From local explanations to global
-    understanding with explainable AI for trees. Nature Machine
-    Intelligence, 2, 56-67.
-
-Author: Menzi Sikakane
+Author: Menzi Sikakane (menzisk)
 Date:   2026-06-17
+License: MIT
 """
 
 import pandas as pd
@@ -30,9 +42,27 @@ matplotlib.use('Agg')
 import shap
 import os
 import xgboost as xgb
+import warnings
+import joblib
+import yaml
+
+warnings.filterwarnings('ignore')
 
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
+
+# ── Load Configuration ──────────────────────────────────────────────
+with open("config.yaml", "r") as f:
+    CONFIG = yaml.safe_load(f)
+
+PROCESSED_DIR = CONFIG['data']['processed_dir']
+MODEL_DIR = CONFIG['outputs']['model_dir']
+FIG_DIR = CONFIG['outputs']['figure_dir']
+DPI = CONFIG['outputs']['dpi']
+RANDOM_STATE = CONFIG['model']['random_state']
+TEST_SIZE = CONFIG['model']['test_size']
+
+os.makedirs(FIG_DIR, exist_ok=True)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 

@@ -1,155 +1,94 @@
+#!/usr/bin/env python3
 """
 02_clean_and_engineer.py
 
-Cleans the raw AMR dataset and engineers features for modelling.
+Cleans raw AMR data and engineers features for machine learning.
 
-Input:  data/raw/acinetobacter_baumannii_amr_raw.tsv
-Output: data/processed/amr_features.tsv
+This script performs the following steps:
+    1. Subsets data to three clinically relevant aminoglycosides
+    2. Drops uninformative columns (taxon_id, evidence, genome_id, genome_name)
+    3. Drops target-leaking columns (measurement_value, measurement_sign)
+    4. One-hot encodes categorical features (antibiotic, laboratory_typing_method)
+    5. Encodes the target label (Resistant=1, Susceptible=0)
+    6. Saves the clean feature set as a TSV file
 
-Cleaning steps:
-   1. Subset to aminoglycoside of interest
-   2. Drop uniformative columns
-   3. Parse measurement_value to numeric
-   4. Encode categorical features
-   5. Encode labels as binary interger
-   6. Handle missing values
+Inputs:
+    data/raw/acinetobacter_baumannii_amr_raw.tsv
+        - Raw AMR phenotype data from 01_download_data.py
 
-Aurthor: Menzi Sikakane
-Date:    2026-06-17
+Outputs:
+    data/processed/amr_features.tsv
+        - Engineered features ready for modelling
+        - Columns: mic_above_range, antibiotic_*, laboratory_typing_method_*, label
+        - Target leakage removed (no MIC values)
+
+Usage:
+    python src/02_clean_and_engineer.py
+
+Author: Menzi Sikakane (menzisk)
+Date:   2026-06-17
+License: MIT
 """
 
 import pandas as pd
 import numpy as np
 import os
+import yaml
 
-#constants/inputs 
-INPUT_FILE  = "data/raw/acinetobacter_baumannii_amr_raw.tsv"
-OUTPUT_DIR  = "data/processed"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "amr_features.tsv") 
+# ── Load Configuration ─────────────────────────────────────────────────────
+with open("config.yaml", "r") as f:
+    CONFIG = yaml.safe_load(f)
 
-#Aminoglycosides we are modelling
-MODEL_ANTIBIOTICS = ["amikacin", "gentamicin", "tobramycin"]
+# Extract settings
+RAW_DIR = CONFIG['data']['raw_dir']
+PROCESSED_DIR = CONFIG['data']['processed_dir']
+MODEL_ANTIBIOTICS = CONFIG['biology']['model_antibiotics']
 
-#coolumns to drop
+# ── Constants ──────────────────────────────────────────────────────────────
+
+INPUT_FILE = os.path.join(RAW_DIR, "acinetobacter_baumannii_amr_raw.tsv")
+OUTPUT_FILE = os.path.join(PROCESSED_DIR, "amr_features.tsv")
+
+# Columns to drop - reasons documented explicitly
 DROP_COLUMNS = {
-    "taxon_id"        : "constant (always 470) — zero information",
-    "evidence"        : "constant after lab filter — zero information",
-    "genome_id"       : "unique identifier — not a biological feature",
-    "genome_name"     : "free-text strain name — too many unique values",
+    "taxon_id": "constant (always 470) — zero information",
+    "evidence": "constant after lab filter — zero information",
+    "genome_id": "unique identifier — not a biological feature",
+    "genome_name": "free-text strain name — too many unique values",
     "measurement_unit": "redundant with laboratory_typing_method",
-    "measurement_value": "TARGET LEAKAGE — MIC is used to derive the resistance label",
-    "measurement_sign" : "TARGET LEAKAGE — sign is part of MIC reporting",
+    "measurement_value": "TARGET LEAKAGE — MIC used to derive resistance label",
+    "measurement_sign": "TARGET LEAKAGE — sign part of MIC reporting",
 }
 
-#funtions
+
+# ── Functions ──────────────────────────────────────────────────────────────
+
 def load_data(filepath: str) -> pd.DataFrame:
-    """Load raw TSV and report shape"""
+    """Load raw TSV and report shape."""
     df = pd.read_csv(filepath, sep="\t")
-    print(f"Loaded : {df.shape[0]:,} rows x {df.shape[1]} columns")
+    print(f"Loaded: {df.shape[0]:,} rows × {df.shape[1]} columns")
     return df
 
-def subset_antibiotics(df: pd.DataFrame) -> pd.DataFrame:
-    """ 
-    Keep only 3 aminoglycosides we are modelling.
 
-    This focuses our model on biologically coherent drug class relevant to ANT(3")-la enzyme inhibitor research.
-    """
+def subset_antibiotics(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep only the three aminoglycosides we are modelling."""
     df_sub = df[df["antibiotic"].isin(MODEL_ANTIBIOTICS)].copy()
     print(f"\nAfter antibiotic subset: {df_sub.shape[0]:,} rows")
     return df_sub
 
-def drop_uniformative_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Remove columns that carry no predictive information.
-    Each dropped column is documented with a reason.
-    """
+
+def drop_uninformative_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove columns that carry no predictive information."""
     print("\nDropping uninformative columns:")
     for col, reason in DROP_COLUMNS.items():
         if col in df.columns:
             df = df.drop(columns=[col])
-            print(f" Dropped '{col}': {reason}")
-    return df
-
-def parse_measurement_value(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Convert measurement_value from text to a numeric MIC value.
-
-    The raw column contains mixed formats:
-        "16"     → clean numeric, MIC = 16
-        ">32"    → above range, we extract 32
-        ">=16"   → at or above, we extract 16
-        "2/38"   → combination drug ratio, set to NaN (not interpretable)
-        ""       → empty string, set to NaN
-
-    Why does this matter?
-    MIC (Minimum Inhibitory Concentration) is the lowest concentration
-    of an antibiotic that prevents visible bacterial growth.
-    Higher MIC → more resistant.
-    This is one of our most biologically informative numeric features.
-
-    Mathematical note:
-    MIC values are typically reported on a doubling dilution scale:
-    0.5, 1, 2, 4, 8, 16, 32, 64, 128 mg/L
-    This is a geometric (log2) scale, not linear.
-    We will log2-transform MIC values so that equal steps on our
-    feature scale correspond to equal biological differences.
-    """
-
-    # Step 1: Replace empty strings with NaN
-    df["measurement_value"] = df["measurement_value"].replace("", np.nan)
-
-    # Step 2: Remove sign characters (>, <, =, >=, <=) to extract number
-    df["mic_numeric"] = (
-        df["measurement_value"]
-        .astype(str)
-        .str.replace(r"[><=]+", "", regex=True)  
-        .str.strip()                               
-    )
-
-    # Step 3: Handle combination drug values like "2/38"
-    df["mic_numeric"] = df["mic_numeric"].where(
-        ~df["mic_numeric"].str.contains("/", na=False),
-        other=np.nan
-    )
-
-    # Step 4: Convert to float (non-numeric strings become NaN)
-    df["mic_numeric"] = pd.to_numeric(df["mic_numeric"], errors="coerce")
-
-    # Step 5: Log2 transform
-    df["mic_log2"] = np.log2(df["mic_numeric"] + 0.001)
-
-    # Step 6: Extract measurement sign as a separate feature
-    df["mic_above_range"] = (
-        df["measurement_sign"]
-        .fillna("")
-        .str.contains(">")
-        .astype(int)  
-    )
-
-    n_mic = df["mic_numeric"].notna().sum()
-    print(f"\nMIC values successfully parsed: {n_mic:,} of {len(df):,}")
-    print(f"MIC range: {df['mic_numeric'].min()} – {df['mic_numeric'].max()} mg/L")
-
+            print(f"  Dropped '{col}': {reason}")
     return df
 
 
 def encode_categorical_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    One-hot encode categorical features.
-
-    One-hot encoding converts a categorical column with k categories
-    into k binary (0/1) columns. This avoids implying a false numerical
-    ordering between categories.
-
-    Example:
-        antibiotic         →   antibiotic_amikacin  antibiotic_gentamicin  ...
-        amikacin           →         1                      0
-        gentamicin         →         0                      1
-
-    drop_first=False: we keep all k columns (not k-1) because XGBoost
-    handles multicollinearity and we want explicit biological interpretability
-    for each drug in our SHAP plots.
-    """
+    """One-hot encode categorical features."""
     categorical_cols = ["antibiotic", "laboratory_typing_method"]
 
     print("\nOne-hot encoding categorical columns:")
@@ -165,23 +104,14 @@ def encode_categorical_features(df: pd.DataFrame) -> pd.DataFrame:
         df,
         columns=categorical_cols,
         drop_first=False,
-        dtype=int,           
+        dtype=int,
     )
 
     return df
 
 
 def encode_label(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Encode the target variable (label) as a binary integer.
-
-    ML classifiers require numeric labels:
-        Resistant   → 1
-        Susceptible → 0
-
-    This choice (Resistant=1) means our model's positive class
-    is resistance — which is the clinically important outcome to detect.
-    """
+    """Encode the target variable as a binary integer."""
     label_map = {"Resistant": 1, "Susceptible": 0}
     df["label"] = df["resistant_phenotype"].map(label_map)
 
@@ -193,12 +123,8 @@ def encode_label(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def drop_raw_columns_post_encoding(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Drop columns that have been superseded by engineered features.
-    """
-    cols_to_drop = [
-        "resistant_phenotype",  # superseded by label
-    ]
+    """Drop columns that have been superseded."""
+    cols_to_drop = ["resistant_phenotype"]
     existing = [c for c in cols_to_drop if c in df.columns]
     df = df.drop(columns=existing)
     print(f"\nDropped post-encoding columns: {existing}")
@@ -206,8 +132,8 @@ def drop_raw_columns_post_encoding(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_processed_data(df: pd.DataFrame) -> None:
-    """Save the engineered feature set to data/processed/."""
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    """Save the engineered feature set."""
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
     df.to_csv(OUTPUT_FILE, sep="\t", index=False)
     print(f"\nProcessed data saved → {OUTPUT_FILE}")
 
@@ -236,7 +162,7 @@ if __name__ == "__main__":
 
     df = load_data(INPUT_FILE)
     df = subset_antibiotics(df)
-    df = drop_uniformative_columns(df)
+    df = drop_uninformative_columns(df)
     df = encode_categorical_features(df)
     df = encode_label(df)
     df = drop_raw_columns_post_encoding(df)
@@ -244,4 +170,3 @@ if __name__ == "__main__":
     print_feature_summary(df)
 
     print("\n Feature engineering complete.")
-

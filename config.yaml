@@ -1,0 +1,43 @@
+# config.yaml
+# AMR resistance prediction pipeline configuration
+# Edit this file to change model parameters without touching code
+
+# ── Data ──────────────────────────────────────────────────────────────
+data:
+  # NCBI taxonomy ID for Acinetobacter baumannii
+  taxon_id: 470
+  
+  # Download each class separately to ensure both are captured
+  phenotype_classes: ["Resistant", "Susceptible"]
+  limit_per_class: 25000
+  
+  raw_dir: "data/raw/"
+  processed_dir: "data/processed/"
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  random_state: 42       # Fixed seed for reproducibility
+  test_size: 0.20        # 80% train, 20% test
+  n_folds: 5             # 5-fold cross-validation
+  
+  # XGBoost hyperparameters
+  n_estimators: 200      # Number of trees
+  max_depth: 4           # Tree depth (3-6 is typical for tabular data)
+  learning_rate: 0.1     # Step size (eta) - lower = more robust, more trees needed
+  subsample: 0.8         # Fraction of records per tree (stochastic boosting)
+  colsample_bytree: 0.8  # Fraction of features per tree
+  eval_metric: "logloss" # Loss function for binary classification
+
+# ── Outputs ──────────────────────────────────────────────────────────────
+outputs:
+  figure_dir: "outputs/figures/"
+  model_dir: "outputs/models/"
+  dpi: 300               # Publication-quality resolution
+
+# ── Biological Context ──────────────────────────────────────────────────
+# This connects the model to your MSc research on ANT enzymes
+biology:
+  model_antibiotics: ["amikacin", "gentamicin", "tobramycin"]
+  enzyme: "ANT(3'')-Ia"
+  organism: "Acinetobacter baumannii"
+  organism_short: "A. baumannii"
