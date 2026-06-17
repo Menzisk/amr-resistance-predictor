@@ -36,3 +36,5 @@ env/
 Thumbs.db
 outputs/*.png
 outputs/*.tsv
+outputs/*.png
+outputs/*.tsv
