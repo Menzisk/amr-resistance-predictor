@@ -1,1 +1,58 @@
+# ── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
 
+# ── Data files (too large for GitHub) ──────────────────────────────────
+data/raw/
+data/processed/
+*.tsv
+*.csv
+*.xlsx
+
+# ── Outputs ─────────────────────────────────────────────────────────────
+# Track figures (portfolio showcase), ignore models and logs
+outputs/models/
+outputs/*.txt
+outputs/*.log
+outputs/current_performance.txt
+
+# ── Model files (large binary files) ──────────────────────────────────
+*.pkl
+*.joblib
+*.model
+*.h5
+*.pt
+*.pth
+
+# ── Jupyter Notebooks ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Environment ────────────────────────────────────────────────────────
+.env
+venv/
+ENV/
+env/
+.venv
+
+# ── IDE ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Git ─────────────────────────────────────────────────────────────────
+.git/
+*.log
