@@ -1,0 +1,28 @@
+{
+  "cross_validation": {
+    "roc_auc": {
+      "mean_test": 0.7497,
+      "std_test": 0.0154,
+      "mean_train": 0.753
+    },
+    "f1": {
+      "mean_test": 0.7496,
+      "std_test": 0.0116,
+      "mean_train": 0.7496
+    },
+    "accuracy": {
+      "mean_test": 0.6907,
+      "std_test": 0.0126,
+      "mean_train": 0.6907
+    }
+  },
+  "test_set": {
+    "roc_auc": 0.7423,
+    "f1": 0.7323
+  },
+  "config": {
+    "random_state": 42,
+    "test_size": 0.2,
+    "n_folds": 5
+  }
+}
