@@ -56,3 +56,10 @@ Thumbs.db
 # ── Git ─────────────────────────────────────────────────────────────────
 .git/
 *.log
+
+# Images folder (duplicate of outputs/figures/)
+images/
+
+# Data and notebooks (excluded from GitHub)
+data/
+notebooks/
