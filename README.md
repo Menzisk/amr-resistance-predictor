@@ -12,14 +12,14 @@
 
 Antimicrobial resistance (AMR) is a global health crisis, with **Acinetobacter baumannii** emerging as a critical priority pathogen. Aminoglycoside-modifying enzymes (AMEs) like **ANT(3'')-Ia** confer resistance to clinically important antibiotics, making treatment increasingly difficult.
 
-This project builds a **machine learning pipeline** that predicts aminoglycoside resistance from phenotypic metadata alone (drug identity and testing method), using **XGBoost** with **SHAP** interpretability. The pipeline is a feature-lean, production-style design demonstrating that drug identity and testing method alone carry meaningful predictive signal — a deliberate baseline before incorporating genomic features.
+This project builds a **machine learning pipeline** that predicts aminoglycoside resistance from phenotypic metadata alone (drug identity and testing method), using **XGBoost** with **SHAP** interpretability. The pipeline is a feature-lean, production-style design demonstrating that drug identity and testing method alone carry meaningful predictive signal a deliberate baseline before incorporating genomic features.
 
 > **Note on feature space:** The model uses 6 binary features (drug identity + testing method) as a principled baseline to isolate phenotypic signal. This design is intentional: tree ensembles converge on the same decision boundary given the sparse feature space, which is why XGBoost, Random Forest, and LightGBM yield identical ROC-AUC scores. XGBoost is selected for its built-in SHAP support and industry adoption.
 
 ### Why This Matters
 
 - **Clinical relevance**: Predict resistance patterns to guide antibiotic selection
-- **Interpretability**: SHAP reveals *why* the model makes predictions — not just what it predicts
+- **Interpretability**: SHAP reveals *why* the model makes predictions, not just what it predicts
 - **Reproducibility**: Full pipeline from data download to model interpretation, config-driven and containerised
 - **Biological context**: Directly relevant to AME-mediated resistance mechanisms studied in companion structural biology work (see [Related Work](#related-work))
 - **Transferability**: Demonstrates a production-ready tabular ML pipeline applicable to any binary classification problem with phenotypic or observational data
@@ -73,7 +73,7 @@ This project builds a **machine learning pipeline** that predicts aminoglycoside
 | **LightGBM** | 0.7423 | 0.8204 | 0.29s |
 | **Logistic Regression** | 0.7372 | 0.7323 | 0.17s |
 
-All three tree ensemble models converge on the same ROC-AUC and F1 given the sparse 6-feature binary input space — this is expected and confirms that the decision boundary is fully captured at this feature resolution. XGBoost is selected as the primary model for its native SHAP integration and widespread industry adoption for tabular data.
+All three tree ensemble models converge on the same ROC-AUC and F1 given the sparse 6-feature binary input space, this is expected and confirms that the decision boundary is fully captured at this feature resolution. XGBoost is selected as the primary model for its native SHAP integration and widespread industry adoption for tabular data.
 
 ### Advanced Validation
 
@@ -135,7 +135,7 @@ amr-resistance-predictor/
 
 ## Related Work
 
-This repository is part of a broader computational AMR research portfolio focused on **ANT(3'')-Ia aminoglycoside nucleotidyltransferase** — the enzyme family responsible for the resistance phenotypes modelled here.
+This repository is part of a broader computational AMR research portfolio focused on **ANT(3'')-Ia aminoglycoside nucleotidyltransferase**, the enzyme family responsible for the resistance phenotypes modelled here.
 
 | Repository | Description |
 |------------|-------------|
@@ -143,7 +143,7 @@ This repository is part of a broader computational AMR research portfolio focuse
 | **ANT-MDS-Analysis** *(coming soon)* | MD simulation analysis: dPCA, FEL, DCCM, MM/GBSA for AbANT and SaANT |
 | **ANT-MDS-Database** *(coming soon)* | Curated simulation data: 14 systems (7 ligands × 2 enzymes), trajectories and configs |
 
-The structural biology work in ANT-MDS-Analysis directly contextualises the resistance mechanisms driving the SHAP signal observed here — particularly the Gentamicin signal, which is consistent with ANT(3'')-Ia substrate specificity and the enzyme's conformational dynamics under aminoglycoside binding.
+The structural biology work in ANT-MDS-Analysis directly contextualises the resistance mechanisms driving the SHAP signal observed here, particularly the Gentamicin signal, which is consistent with ANT(3'')-Ia substrate specificity and the enzyme's conformational dynamics under aminoglycoside binding.
 
 ---
 
