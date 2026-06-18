@@ -53,7 +53,7 @@ OUTPUT_FILE = os.path.join(PROCESSED_DIR, "amr_features.tsv")
 DROP_COLUMNS = {
     "taxon_id": "constant (always 470) — zero information",
     "evidence": "constant after lab filter — zero information",
-    "genome_id": "unique identifier — not a biological feature",
+    #"genome_id": "unique identifier — not a biological feature",
     "genome_name": "free-text strain name — too many unique values",
     "measurement_unit": "redundant with laboratory_typing_method",
     "measurement_value": "TARGET LEAKAGE — MIC used to derive resistance label",
