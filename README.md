@@ -147,17 +147,6 @@ The structural biology work in ANT-MDS-Analysis directly contextualises the resi
 
 ---
 
-## Citation
-
-If you use this pipeline or data in your work, please cite:
-
-```
-Sikakane, M. et al. (in preparation). Computational characterisation of ANT(3'')-Ia
-aminoglycoside resistance enzymes from Acinetobacter baumannii and Staphylococcus aureus.
-```
-
----
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
